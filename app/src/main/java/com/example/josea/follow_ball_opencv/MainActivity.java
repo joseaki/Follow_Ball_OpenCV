@@ -1,11 +1,15 @@
 package com.example.josea.follow_ball_opencv;
 
+import android.content.ContentValues;
+import android.hardware.Camera;
+import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
 import android.widget.TextView;
 
+import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
@@ -19,16 +23,36 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
+import javax.net.ssl.HttpsURLConnection;
+
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
     JavaCameraView javaCameraView;
+    //
+    double[] circle_mean={0,0,0};
+    //
     Mat mRgba, imgGray,imgHSV, imgCanny, mask, res, kernel,circles,hsv;
     int height=240;
     int width=320;
+    //center area it's the double of what's give in center_percentage
     double center_percentage=0.07;
+    int lateral_width=(int)((width-(width*center_percentage*2))/2);
     int mid=(int)(width/2);
     //blue mask
     Scalar lower_blue=new Scalar(90, 100, 80);
@@ -45,6 +69,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     String[] labels={"izquierda","centro","derecha"};
     int left,center,right=0;
     int i_label,distance2target=0;
+    //speed of wheels
+    int distance2center=0;
+    int v_right,v_left,v_center=512;
+
 
     BaseLoaderCallback mLoaderCallBack=new BaseLoaderCallback(this) {
         @Override
@@ -83,6 +111,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(this);
         javaCameraView.setMaxFrameSize(width,height);
+
         // Example of a call to a native method
         //TextView tv = (TextView) findViewById(R.id.sample_text);
         //tv.setText(stringFromJNI());
@@ -162,7 +191,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         //get circles
         Imgproc.HoughCircles(res,circles,Imgproc.HOUGH_GRADIENT,1,30,50,20,0,0);
         //draw the circles
-        double[] circle_mean={0,0,0};
+        circle_mean[0]=0;circle_mean[1]=0;circle_mean[2]=0;
         if(circles!=null){
             for (int x = 0; x < circles.cols(); x++){
                 double vCircle[] = circles.get(0,x);
@@ -176,7 +205,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             Point center_c=new Point(circle_mean[0],circle_mean[1]);
             Imgproc.circle(mRgba,center_c, ((int)circle_mean[2]),new Scalar(0,255,0),3);
             Imgproc.circle(mRgba,center_c, 2,new Scalar(0,100,255),3);
-            //calculate if it's left, center, right
+            //calculate if it's left, center or right
             double x_circle=circle_mean[0];
             if(cant_frames<5){
                 cant_frames+=1;
@@ -198,27 +227,67 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                     i_label=2;
                 }
                 //pixels to distance
-                distance2target= (int) (1107.3*(Math.pow(circle_mean[2],-1.13)));
+                distance2target= (int) (296.94*(Math.pow(circle_mean[2]*100/width,-1.13)));
                 cant_frames=0;
                 left=0;center=0;right=0;
             }
+            speed();
+            new SendPostRequest().execute();
         }
-        Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.35,new Scalar(0,255,255),1);
-        Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.35,new Scalar(0,255,255),1);
-        //
-        //
-        //
-        //Imgproc.cvtColor(mRgba,imgGray,Imgproc.COLOR_RGB2GRAY);
-        //Imgproc.Canny(imgGray,imgCanny,50,150);
-        /*
-        imgHSV.release();
-        mask.release();
-        res.release();
-        kernel.release();
-        circles.release();
-        System.gc();
-        */
+        Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
+        Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
 
         return mRgba;
+    }
+    private void speed(){
+        switch (labels[i_label]){
+            case ("centro"):{
+                v_right=512;
+                v_left=512;
+                break;
+            }
+            case("izquierda"):{
+                distance2center=(int)(mid-circle_mean[0]);
+                int pwm=distance2center*512/lateral_width;
+                v_right=v_center+pwm;
+                v_left=v_center-pwm;
+                break;
+            }
+            case("derecha"):{
+                distance2center=(int)(circle_mean[0]-mid);
+                int pwm=distance2center*512/lateral_width;
+                v_right=v_center-pwm;
+                v_left=v_center+pwm;
+                break;
+            }
+            default:{
+                v_right=512;
+                v_left=512;
+                break;
+            }
+        }
+    }
+    public class SendPostRequest extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... params) {
+            try {
+                
+                URL url = new URL("http://192.168.137.200/body?v_right=" + v_right+"&v_left="+v_left);
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+                BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder result = new StringBuilder();
+                String inputLine;
+                while ((inputLine = in.readLine()) != null)
+                    result.append(inputLine).append("\n");
+
+                in.close();
+                connection.disconnect();
+                return result.toString();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
     }
 }
