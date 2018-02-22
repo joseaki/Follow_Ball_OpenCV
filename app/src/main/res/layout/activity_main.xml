@@ -2,9 +2,11 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/activity_main"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    style="@style/Landscape_camera"
+    >
      <ImageView
-         android:id="@+id/imageViewPause"
+         android:id="@+id/imageViewDown"
          android:layout_width="30dp"
          android:layout_height="30dp"
          android:layout_centerInParent="true"
@@ -12,6 +14,25 @@
          android:src="@drawable/menu_icon"
          android:layout_alignParentTop="true"
          android:layout_alignParentLeft="true"
+         android:translationZ="9dp"/>
+     <ImageView
+         android:id="@+id/imageViewUp"
+         android:layout_width="30dp"
+         android:layout_height="30dp"
+         android:layout_centerInParent="true"
+         android:layout_margin="12dp"
+         android:src="@drawable/menu_icon"
+         android:layout_alignParentTop="true"
+         android:layout_alignParentRight="true"
+         android:translationZ="9dp"/>
+     <ImageView
+         android:id="@+id/imageViewToggle"
+         android:layout_width="30dp"
+         android:layout_height="30dp"
+         android:layout_centerInParent="true"
+         android:layout_margin="12dp"
+         android:src="@drawable/menu_icon"
+         android:layout_alignParentTop="true"
          android:translationZ="9dp"/>
 
      <org.opencv.android.JavaCameraView

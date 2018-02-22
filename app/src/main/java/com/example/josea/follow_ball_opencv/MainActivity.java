@@ -1,13 +1,22 @@
 package com.example.josea.follow_ball_opencv;
 
+import android.content.ClipData;
 import android.content.ContentValues;
+import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import com.pavelsikun.vintagechroma.ChromaDialog;
+import com.pavelsikun.vintagechroma.IndicatorMode;
+import com.pavelsikun.vintagechroma.colormode.ColorMode;
 
 import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
@@ -54,9 +63,11 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     double center_percentage=0.07;
     int lateral_width=(int)((width-(width*center_percentage*2))/2);
     int mid=(int)(width/2);
-    //blue mask
-    Scalar lower_blue=new Scalar(90, 100, 80);
-    Scalar upper_blue=new Scalar(150, 255, 250);
+    //color mask
+    double[] lower_color= { 90, 50,  30};
+    double[] upper_color= {150, 255, 220};
+    Scalar lower_blue=new Scalar(lower_color);
+    Scalar upper_blue=new Scalar(upper_color);
     //calculate the borders of the frame
     double center_left=mid-(width*center_percentage);
     double center_right=mid+(width*center_percentage);
@@ -72,7 +83,9 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     //speed of wheels
     int distance2center=0;
     int v_right,v_left,v_center=512;
-
+    //toggle button
+    boolean view_toggle=false;
+    private ArrayList<ClipData.Item> mItems;
 
     BaseLoaderCallback mLoaderCallBack=new BaseLoaderCallback(this) {
         @Override
@@ -105,12 +118,29 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            view_toggle=savedInstanceState.getBoolean("view");
+            lower_color= savedInstanceState.getDoubleArray("lc");
+            upper_color=savedInstanceState.getDoubleArray("uc");
+            lower_blue.set(lower_color);
+            upper_blue.set(upper_color);
+        }
         setContentView(R.layout.activity_main);
 
         javaCameraView=(JavaCameraView)findViewById(R.id.javaCameraView);
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(this);
         javaCameraView.setMaxFrameSize(width,height);
+
+
+        ImageView toggle=(ImageView)findViewById(R.id.imageViewToggle);
+        toggle.setOnClickListener(view -> {
+            view_toggle= !view_toggle;
+        });
+        ImageView menuUpImage= (ImageView)findViewById(R.id.imageViewUp);
+        menuUpImage.setOnClickListener(view -> hsv_color_picker_up());
+        ImageView menuDownImage= (ImageView)findViewById(R.id.imageViewDown);
+        menuDownImage.setOnClickListener(view -> hsv_color_picker_down());
 
         // Example of a call to a native method
         //TextView tv = (TextView) findViewById(R.id.sample_text);
@@ -139,7 +169,69 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
              OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION,this,mLoaderCallBack);
          }
      }
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
 
+        // Save our own state now
+        outState.putDoubleArray("lc",lower_color);
+        outState.putDoubleArray("uc",upper_color);
+        outState.putBoolean("view",view_toggle);
+        super.onSaveInstanceState(outState);
+    }
+
+
+     private void hsv_color_picker_up(){
+         float[] hsv_color={
+                 (float)upper_color[0]*2,
+                 (float)upper_color[1]/255,
+                 (float)upper_color[2]/255};
+
+         new ChromaDialog.Builder()
+                 .initialColor(Color.HSVToColor(hsv_color))
+                 .colorMode(ColorMode.HSV) // RGB, ARGB, HVS, CMYK, CMYK255, HSL
+                 .indicatorMode(IndicatorMode.DECIMAL) //HEX or DECIMAL; Note that (HSV || HSL || CMYK) && IndicatorMode.HEX is a bad idea
+                 .onColorSelected(color ->{
+                     setUpper_color(color);
+                     Toast.makeText(getApplicationContext(),""+upper_color[0]+","+upper_color[1]+","+upper_color[2],Toast.LENGTH_LONG).show();
+                 })
+                 .create()
+                 .show(getSupportFragmentManager(), "ChromaDialog");
+     }
+
+     private void hsv_color_picker_down(){
+        float[] hsv_color={
+                (float)lower_color[0]*2,
+                (float)lower_color[1]/255,
+                (float)lower_color[2]/255};
+        new ChromaDialog.Builder()
+                .initialColor(Color.HSVToColor(hsv_color))
+                .colorMode(ColorMode.HSV) // RGB, ARGB, HVS, CMYK, CMYK255, HSL
+                .indicatorMode(IndicatorMode.DECIMAL) //HEX or DECIMAL; Note that (HSV || HSL || CMYK) && IndicatorMode.HEX is a bad idea
+                .onColorSelected(color ->{
+                    Toast.makeText(getApplicationContext(),""+lower_color[0]+","+lower_color[1]+","+lower_color[2],Toast.LENGTH_LONG).show();
+                    setLower_color(color);
+                })
+                .create()
+                .show(getSupportFragmentManager(), "ChromaDialog");
+    }
+
+     private void setLower_color(int color){
+         float[] hsv = new float[3];
+         Color.colorToHSV(color, hsv);
+         lower_color[0]=hsv[0]/2;
+         lower_color[1]=hsv[1]*255;
+         lower_color[2]=hsv[2]*255;
+         lower_blue.set(lower_color);
+     }
+
+     private void setUpper_color(int color){
+         float[] hsv = new float[3];
+         Color.colorToHSV(color, hsv);
+         upper_color[0]=hsv[0]/2;
+         upper_color[1]=hsv[1]*255;
+         upper_color[2]=hsv[2]*255;
+         upper_blue.set(upper_color);
+     }
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
@@ -236,9 +328,11 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         }
         Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
         Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
-
-        return mRgba;
+        if(view_toggle)
+            return mRgba;
+        return mask;
     }
+
     private void speed(){
         switch (labels[i_label]){
             case ("centro"):{
@@ -267,6 +361,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             }
         }
     }
+
     public class SendPostRequest extends AsyncTask<String, Void, String> {
         @Override
         protected String doInBackground(String... params) {

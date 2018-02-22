@@ -32,6 +32,10 @@ android {
             jni.srcDirs = ['src/main/jni', 'src/main/jniLibs/']
         }
     }
+    compileOptions {
+        targetCompatibility 1.8
+        sourceCompatibility 1.8
+    }
 }
 
 dependencies {
@@ -42,4 +46,5 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.1'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.1'
     compile project(':openCVLibrary340')
+    compile 'com.pavelsikun:vintage-chroma:1.5'
 }
