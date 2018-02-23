@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     double[] upper_color= {150, 255, 220};
     Scalar lower_blue=new Scalar(lower_color);
     Scalar upper_blue=new Scalar(upper_color);
+
     //calculate the borders of the frame
     double center_left=mid-(width*center_percentage);
     double center_right=mid+(width*center_percentage);
@@ -84,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     int distance2center=0;
     int v_right,v_left,v_center=512;
     //toggle button
-    boolean view_toggle=false;
+    int view_toggle=0;
     private ArrayList<ClipData.Item> mItems;
 
     BaseLoaderCallback mLoaderCallBack=new BaseLoaderCallback(this) {
@@ -119,7 +120,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
-            view_toggle=savedInstanceState.getBoolean("view");
+            view_toggle=savedInstanceState.getInt("view");
             lower_color= savedInstanceState.getDoubleArray("lc");
             upper_color=savedInstanceState.getDoubleArray("uc");
             lower_blue.set(lower_color);
@@ -135,7 +136,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
         ImageView toggle=(ImageView)findViewById(R.id.imageViewToggle);
         toggle.setOnClickListener(view -> {
-            view_toggle= !view_toggle;
+            if(view_toggle>=2)
+                view_toggle=0;
+            else
+                view_toggle++;
         });
         ImageView menuUpImage= (ImageView)findViewById(R.id.imageViewUp);
         menuUpImage.setOnClickListener(view -> hsv_color_picker_up());
@@ -175,7 +179,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         // Save our own state now
         outState.putDoubleArray("lc",lower_color);
         outState.putDoubleArray("uc",upper_color);
-        outState.putBoolean("view",view_toggle);
+        outState.putInt("view",view_toggle);
         super.onSaveInstanceState(outState);
     }
 
@@ -275,13 +279,11 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         Imgproc.morphologyEx(mask,mask,Imgproc.MORPH_CLOSE,kernel);
         //merge frame with mask
         Core.bitwise_and(mRgba,mRgba,res,mask);
-        //blur just gray image
-
+        //blur just saturation layer
         Core.extractChannel(res,hsv,1);
-
-        Imgproc.medianBlur(hsv,res,5);
+        Imgproc.medianBlur(hsv,res,15);
         //get circles
-        Imgproc.HoughCircles(res,circles,Imgproc.HOUGH_GRADIENT,1,30,50,20,0,0);
+        Imgproc.HoughCircles(res,circles,Imgproc.HOUGH_GRADIENT,1,30,180,20,0,0);
         //draw the circles
         circle_mean[0]=0;circle_mean[1]=0;circle_mean[2]=0;
         if(circles!=null){
@@ -328,9 +330,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         }
         Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
         Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
-        if(view_toggle)
-            return mRgba;
-        return mask;
+
+        if(view_toggle==0)return mRgba;
+        else if(view_toggle==1)return mask;
+        return res;
     }
 
     private void speed(){
