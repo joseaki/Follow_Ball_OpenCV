@@ -1,24 +1,18 @@
 package com.example.josea.follow_ball_opencv;
 
-import android.content.ClipData;
-import android.content.ContentValues;
 import android.graphics.Color;
-import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
-import android.view.View;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.pavelsikun.vintagechroma.ChromaDialog;
 import com.pavelsikun.vintagechroma.IndicatorMode;
 import com.pavelsikun.vintagechroma.colormode.ColorMode;
 
-import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
@@ -32,24 +26,11 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Vector;
-
-import javax.net.ssl.HttpsURLConnection;
 
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
     JavaCameraView javaCameraView;
@@ -57,14 +38,15 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     double[] circle_mean={0,0,0};
     //
     Mat mRgba, imgGray,imgHSV, imgCanny, mask, res, kernel,circles,hsv;
-    int height=240;
-    int width=320;
+    //camera image size
+    int height=375;
+    int width=580;
     //center area it's the double of what's give in center_percentage
     double center_percentage=0.07;
     int lateral_width=(int)((width-(width*center_percentage*2))/2);
     int mid=(int)(width/2);
     //color mask
-    double[] lower_color= { 90, 50,  30};
+    double[] lower_color= { 90, 128,  60};
     double[] upper_color= {150, 255, 220};
     Scalar lower_blue=new Scalar(lower_color);
     Scalar upper_blue=new Scalar(upper_color);
@@ -83,10 +65,11 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     int i_label,distance2target=0;
     //speed of wheels
     int distance2center=0;
-    int v_right,v_left,v_center=512;
+    static int v_right;
+    static int v_left;
+    int v_center=512;
     //toggle button
     int view_toggle=0;
-    private ArrayList<ClipData.Item> mItems;
 
     BaseLoaderCallback mLoaderCallBack=new BaseLoaderCallback(this) {
         @Override
@@ -128,25 +111,25 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         }
         setContentView(R.layout.activity_main);
 
-        javaCameraView=(JavaCameraView)findViewById(R.id.javaCameraView);
+        javaCameraView=findViewById(R.id.javaCameraView);
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(this);
         javaCameraView.setMaxFrameSize(width,height);
 
 
-        ImageView toggle=(ImageView)findViewById(R.id.imageViewToggle);
+        ImageView toggle=findViewById(R.id.imageViewToggle);
         toggle.setOnClickListener(view -> {
             if(view_toggle>=2)
                 view_toggle=0;
             else
                 view_toggle++;
         });
-        ImageView menuUpImage= (ImageView)findViewById(R.id.imageViewUp);
+        ImageView menuUpImage= findViewById(R.id.imageViewUp);
         menuUpImage.setOnClickListener(view -> hsv_color_picker_up());
-        ImageView menuDownImage= (ImageView)findViewById(R.id.imageViewDown);
+        ImageView menuDownImage= findViewById(R.id.imageViewDown);
         menuDownImage.setOnClickListener(view -> hsv_color_picker_down());
 
-        // Example of a call to a native method
+        //Example of a call to a native method
         //TextView tv = (TextView) findViewById(R.id.sample_text);
         //tv.setText(stringFromJNI());
     }
@@ -240,7 +223,6 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
      */
-    public native String stringFromJNI();
 
     @Override
     public void onCameraViewStarted(int width, int height) {
@@ -270,7 +252,6 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         Imgproc.cvtColor(mRgba,imgHSV,Imgproc.COLOR_RGB2HSV);
         //make mask
         Core.inRange(imgHSV,lower_blue,upper_blue,mask);
-
         //mask smoth
         Size size= new Size(35,35);
         Imgproc.GaussianBlur(mask,mask,size,0);
@@ -281,7 +262,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         Core.bitwise_and(mRgba,mRgba,res,mask);
         //blur just saturation layer
         Core.extractChannel(res,hsv,1);
-        Imgproc.medianBlur(hsv,res,15);
+        Imgproc.medianBlur(hsv,res,55);
         //get circles
         Imgproc.HoughCircles(res,circles,Imgproc.HOUGH_GRADIENT,1,30,180,20,0,0);
         //draw the circles
@@ -317,7 +298,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                     i_label=1;
                 }
                 if(right>max){
-                    max=right;
+                    //max=right;
                     i_label=2;
                 }
                 //pixels to distance
@@ -337,22 +318,25 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     }
 
     private void speed(){
+        v_center=(int)(6.24*distance2target+137.6);
+        v_center=v_center>512?512:v_center;
+        v_center=v_center<200?0:v_center;
         switch (labels[i_label]){
             case ("centro"):{
-                v_right=512;
-                v_left=512;
+                v_right=v_center;
+                v_left=v_center;
                 break;
             }
             case("izquierda"):{
                 distance2center=(int)(mid-circle_mean[0]);
-                int pwm=distance2center*512/lateral_width;
+                int pwm=distance2center*v_center/lateral_width;
                 v_right=v_center+pwm;
                 v_left=v_center-pwm;
                 break;
             }
             case("derecha"):{
                 distance2center=(int)(circle_mean[0]-mid);
-                int pwm=distance2center*512/lateral_width;
+                int pwm=distance2center*v_center/lateral_width;
                 v_right=v_center-pwm;
                 v_left=v_center+pwm;
                 break;
@@ -365,7 +349,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         }
     }
 
-    public class SendPostRequest extends AsyncTask<String, Void, String> {
+    public static class SendPostRequest extends AsyncTask<String, Void, String> {
         @Override
         protected String doInBackground(String... params) {
             try {
