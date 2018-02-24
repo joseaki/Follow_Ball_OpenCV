@@ -1,0 +1,1 @@
+If you want to use this application, you must modify the CMakeLists.txt file with the corresponding paths where the OpenCV libraries are located

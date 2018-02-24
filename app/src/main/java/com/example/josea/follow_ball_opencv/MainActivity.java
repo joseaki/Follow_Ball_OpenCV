@@ -1,11 +1,13 @@
 package com.example.josea.follow_ball_opencv;
 
+import android.graphics.Camera;
 import android.graphics.Color;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -33,14 +35,15 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
-    JavaCameraView javaCameraView;
+    OpenCVCameraView javaCameraView;
+
     //
     double[] circle_mean={0,0,0};
     //
     Mat mRgba, imgGray,imgHSV, imgCanny, mask, res, kernel,circles,hsv;
     //camera image size
-    int height=375;
-    int width=580;
+    int height=240;
+    int width=320;
     //center area it's the double of what's give in center_percentage
     double center_percentage=0.07;
     int lateral_width=(int)((width-(width*center_percentage*2))/2);
@@ -102,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (savedInstanceState != null) {
             view_toggle=savedInstanceState.getInt("view");
             lower_color= savedInstanceState.getDoubleArray("lc");
@@ -111,11 +115,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         }
         setContentView(R.layout.activity_main);
 
-        javaCameraView=findViewById(R.id.javaCameraView);
+        javaCameraView=(OpenCVCameraView)findViewById(R.id.javaCameraView);
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(this);
         javaCameraView.setMaxFrameSize(width,height);
-
 
         ImageView toggle=findViewById(R.id.imageViewToggle);
         toggle.setOnClickListener(view -> {
@@ -138,12 +141,18 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         super.onPause();
         if(javaCameraView!=null)
             javaCameraView.disableView();
+            v_right=0;
+            v_left=0;
+            new SendPostRequest().execute();
     }
      @Override
      protected void onDestroy(){
         super.onDestroy();
         if(javaCameraView!=null)
              javaCameraView.disableView();
+             v_right=0;
+             v_left=0;
+             new SendPostRequest().execute();
      }
      @Override
      protected  void onResume(){
@@ -151,6 +160,9 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
          if(OpenCVLoader.initDebug()){
              Log.i(TAG,"opencv loaded");
              mLoaderCallBack.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+             v_right=0;
+             v_left=0;
+             new SendPostRequest().execute();
          }else{
              Log.i(TAG,"Opencv not loaded");
              OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION,this,mLoaderCallBack);
@@ -219,6 +231,8 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
          upper_color[2]=hsv[2]*255;
          upper_blue.set(upper_color);
      }
+
+
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
@@ -226,18 +240,20 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
 
     @Override
     public void onCameraViewStarted(int width, int height) {
+        //set camera properties manually
+        javaCameraView.setManualExposure(true);
+        javaCameraView.setExposure(5);
+        //initialize matrix frames
         mRgba=new Mat(height,width, CvType.CV_8UC4);
         imgHSV=new Mat(height,width, CvType.CV_8UC4);
         mask=new Mat(height,width,CvType.CV_8SC1);
-        kernel=new Mat(35,35, CvType.CV_8UC1,Scalar.all(1));
+        kernel=new Mat(25,25, CvType.CV_8UC1,Scalar.all(1));
         res=new Mat(height,width, CvType.CV_8UC4);
         imgGray=new Mat(height,width, CvType.CV_8UC1);
         imgCanny=new Mat(height,width, CvType.CV_8UC1);
         circles=new Mat();
         hsv=new Mat(height,width, CvType.CV_8UC1);
         Log.i(TAG,"inicio");
-
-
     }
 
     @Override
@@ -253,7 +269,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         //make mask
         Core.inRange(imgHSV,lower_blue,upper_blue,mask);
         //mask smoth
-        Size size= new Size(35,35);
+        Size size= new Size(15,15);
         Imgproc.GaussianBlur(mask,mask,size,0);
         Imgproc.threshold(mask,mask,0,255,Imgproc.THRESH_BINARY+Imgproc.THRESH_OTSU);
         //closing mask
@@ -262,7 +278,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         Core.bitwise_and(mRgba,mRgba,res,mask);
         //blur just saturation layer
         Core.extractChannel(res,hsv,1);
-        Imgproc.medianBlur(hsv,res,55);
+        Imgproc.medianBlur(hsv,res,15);
         //get circles
         Imgproc.HoughCircles(res,circles,Imgproc.HOUGH_GRADIENT,1,30,180,20,0,0);
         //draw the circles
@@ -278,8 +294,8 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             circle_mean[1]=circle_mean[1]/circles.cols();
             circle_mean[2]=circle_mean[2]/circles.cols();
             Point center_c=new Point(circle_mean[0],circle_mean[1]);
-            Imgproc.circle(mRgba,center_c, ((int)circle_mean[2]),new Scalar(0,255,0),3);
-            Imgproc.circle(mRgba,center_c, 2,new Scalar(0,100,255),3);
+            Imgproc.circle(mRgba,center_c, ((int)circle_mean[2]),new Scalar(0,255,0),1);
+            Imgproc.circle(mRgba,center_c, 2,new Scalar(0,100,255),2);
             //calculate if it's left, center or right
             double x_circle=circle_mean[0];
             if(cant_frames<5){
@@ -309,8 +325,8 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             speed();
             new SendPostRequest().execute();
         }
-        Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
-        Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.45,new Scalar(0,255,255),1);
+        Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.35,new Scalar(0,255,255),1);
+        Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.35,new Scalar(0,255,255),1);
 
         if(view_toggle==0)return mRgba;
         else if(view_toggle==1)return mask;

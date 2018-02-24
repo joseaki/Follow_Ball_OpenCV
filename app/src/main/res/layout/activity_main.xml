@@ -1,42 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/activity_main"
+    xmlns:opencv="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    style="@style/Landscape_camera"
-    >
+    style="@style/Landscape_camera">
+     <com.example.josea.follow_ball_opencv.OpenCVCameraView
+         android:id="@+id/javaCameraView"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         opencv:show_fps="true"/>
      <ImageView
          android:id="@+id/imageViewDown"
          android:layout_width="30dp"
          android:layout_height="30dp"
          android:layout_centerInParent="true"
          android:layout_margin="12dp"
-         android:src="@drawable/menu_icon"
+         android:src="@drawable/down"
          android:layout_alignParentTop="true"
          android:layout_alignParentLeft="true"
-         android:translationZ="9dp"/>
+         android:layout_alignParentStart="true" />
      <ImageView
          android:id="@+id/imageViewUp"
          android:layout_width="30dp"
          android:layout_height="30dp"
          android:layout_centerInParent="true"
          android:layout_margin="12dp"
-         android:src="@drawable/menu_icon"
+         android:src="@drawable/up"
          android:layout_alignParentTop="true"
-         android:layout_alignParentRight="true"
-         android:translationZ="9dp"/>
+         android:layout_alignParentRight="true"/>
      <ImageView
          android:id="@+id/imageViewToggle"
          android:layout_width="30dp"
          android:layout_height="30dp"
          android:layout_centerInParent="true"
          android:layout_margin="12dp"
-         android:src="@drawable/menu_icon"
-         android:layout_alignParentTop="true"
-         android:translationZ="9dp"/>
+         android:src="@drawable/rotate"
+         android:layout_alignParentTop="true"/>
 
-     <org.opencv.android.JavaCameraView
-        android:id="@+id/javaCameraView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+
 </RelativeLayout>
