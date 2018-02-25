@@ -11,13 +11,15 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.pavelsikun.vintagechroma.ChromaDialog;
-import com.pavelsikun.vintagechroma.IndicatorMode;
-import com.pavelsikun.vintagechroma.colormode.ColorMode;
+
+import com.kunzisoft.androidclearchroma.ChromaDialog;
+import com.kunzisoft.androidclearchroma.IndicatorMode;
+import com.kunzisoft.androidclearchroma.colormode.ColorMode;
+import com.kunzisoft.androidclearchroma.listener.OnColorChangedListener;
+import com.kunzisoft.androidclearchroma.listener.OnColorSelectedListener;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.JavaCameraView;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
@@ -34,7 +36,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2{
+public class MainActivity extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2,OnColorSelectedListener, OnColorChangedListener {
     OpenCVCameraView javaCameraView;
 
     //
@@ -42,13 +44,14 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     //
     Mat mRgba, imgGray,imgHSV, imgCanny, mask, res, kernel,circles,hsv;
     //camera image size
-    int height=240;
-    int width=320;
+    int height=320;
+    int width=480;
     //center area it's the double of what's give in center_percentage
     double center_percentage=0.07;
     int lateral_width=(int)((width-(width*center_percentage*2))/2);
     int mid=(int)(width/2);
     //color mask
+    boolean colorUp=false;
     double[] lower_color= { 90, 128,  60};
     double[] upper_color= {150, 255, 220};
     Scalar lower_blue=new Scalar(lower_color);
@@ -73,7 +76,10 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     int v_center=512;
     //toggle button
     int view_toggle=0;
-
+    //manual exposure
+    boolean man_exposure=false;
+    //flash
+    boolean flash=false;
     BaseLoaderCallback mLoaderCallBack=new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -105,6 +111,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         if (savedInstanceState != null) {
             view_toggle=savedInstanceState.getInt("view");
@@ -127,11 +134,29 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             else
                 view_toggle++;
         });
+        //button to update the lower and upper colors of the mask
         ImageView menuUpImage= findViewById(R.id.imageViewUp);
-        menuUpImage.setOnClickListener(view -> hsv_color_picker_up());
+        menuUpImage.setOnClickListener(view -> {
+            colorUp=true;
+            hsv_color_picker_up();
+        });
         ImageView menuDownImage= findViewById(R.id.imageViewDown);
-        menuDownImage.setOnClickListener(view -> hsv_color_picker_down());
-
+        menuDownImage.setOnClickListener(view -> {
+            colorUp=false;
+            hsv_color_picker_down();
+        });
+        //button lock the exposure
+        ImageView lock= findViewById(R.id.imageViewLock);
+        lock.setOnClickListener(view -> {
+            man_exposure = !man_exposure;
+            javaCameraView.setManualExposure(man_exposure);
+        });
+        //button turn on/off the flash
+        ImageView flashView= findViewById(R.id.imageViewFlash);
+        flashView.setOnClickListener(view -> {
+            flash = !flash;
+            javaCameraView.setLedFlash(flash);
+        });
         //Example of a call to a native method
         //TextView tv = (TextView) findViewById(R.id.sample_text);
         //tv.setText(stringFromJNI());
@@ -189,10 +214,6 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                  .initialColor(Color.HSVToColor(hsv_color))
                  .colorMode(ColorMode.HSV) // RGB, ARGB, HVS, CMYK, CMYK255, HSL
                  .indicatorMode(IndicatorMode.DECIMAL) //HEX or DECIMAL; Note that (HSV || HSL || CMYK) && IndicatorMode.HEX is a bad idea
-                 .onColorSelected(color ->{
-                     setUpper_color(color);
-                     Toast.makeText(getApplicationContext(),""+upper_color[0]+","+upper_color[1]+","+upper_color[2],Toast.LENGTH_LONG).show();
-                 })
                  .create()
                  .show(getSupportFragmentManager(), "ChromaDialog");
      }
@@ -206,10 +227,6 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                 .initialColor(Color.HSVToColor(hsv_color))
                 .colorMode(ColorMode.HSV) // RGB, ARGB, HVS, CMYK, CMYK255, HSL
                 .indicatorMode(IndicatorMode.DECIMAL) //HEX or DECIMAL; Note that (HSV || HSL || CMYK) && IndicatorMode.HEX is a bad idea
-                .onColorSelected(color ->{
-                    Toast.makeText(getApplicationContext(),""+lower_color[0]+","+lower_color[1]+","+lower_color[2],Toast.LENGTH_LONG).show();
-                    setLower_color(color);
-                })
                 .create()
                 .show(getSupportFragmentManager(), "ChromaDialog");
     }
@@ -241,8 +258,8 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
     @Override
     public void onCameraViewStarted(int width, int height) {
         //set camera properties manually
-        javaCameraView.setManualExposure(true);
-        javaCameraView.setExposure(5);
+        //javaCameraView.setManualExposure(true);
+        //javaCameraView.setExposure(0);
         //initialize matrix frames
         mRgba=new Mat(height,width, CvType.CV_8UC4);
         imgHSV=new Mat(height,width, CvType.CV_8UC4);
@@ -269,16 +286,16 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         //make mask
         Core.inRange(imgHSV,lower_blue,upper_blue,mask);
         //mask smoth
-        Size size= new Size(15,15);
+        Size size= new Size(25,25);
         Imgproc.GaussianBlur(mask,mask,size,0);
         Imgproc.threshold(mask,mask,0,255,Imgproc.THRESH_BINARY+Imgproc.THRESH_OTSU);
         //closing mask
-        Imgproc.morphologyEx(mask,mask,Imgproc.MORPH_CLOSE,kernel);
+        //Imgproc.morphologyEx(mask,mask,Imgproc.MORPH_CLOSE,kernel);
         //merge frame with mask
         Core.bitwise_and(mRgba,mRgba,res,mask);
         //blur just saturation layer
         Core.extractChannel(res,hsv,1);
-        Imgproc.medianBlur(hsv,res,15);
+        Imgproc.medianBlur(hsv,res,25);
         //get circles
         Imgproc.HoughCircles(res,circles,Imgproc.HOUGH_GRADIENT,1,30,180,20,0,0);
         //draw the circles
@@ -298,7 +315,7 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
             Imgproc.circle(mRgba,center_c, 2,new Scalar(0,100,255),2);
             //calculate if it's left, center or right
             double x_circle=circle_mean[0];
-            if(cant_frames<5){
+            if(cant_frames < 1){
                 cant_frames+=1;
                 if(x_circle>left_left && x_circle<left_right)
                     left+=1;
@@ -328,9 +345,12 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
         Imgproc.putText(mRgba,"Direccion: "+labels[i_label],new Point(20,20),Core.FONT_HERSHEY_DUPLEX,0.35,new Scalar(0,255,255),1);
         Imgproc.putText(mRgba,"Distancia: "+distance2target,new Point(20,60),Core.FONT_HERSHEY_DUPLEX,0.35,new Scalar(0,255,255),1);
 
-        if(view_toggle==0)return mRgba;
-        else if(view_toggle==1)return mask;
-        return res;
+        if(view_toggle==0)
+            return mRgba;
+        else if(view_toggle==1)
+            return mask;
+        else
+            return res;
     }
 
     private void speed(){
@@ -363,6 +383,33 @@ public class MainActivity extends AppCompatActivity implements CameraBridgeViewB
                 break;
             }
         }
+    }
+
+    @Override
+    public void onColorChanged(int color) {
+        if(colorUp){
+            setUpper_color(color);
+            //Toast.makeText(getApplicationContext(),"Maximo"+upper_color[0]+","+upper_color[1]+","+upper_color[2],Toast.LENGTH_SHORT).show();
+        }else{
+            //Toast.makeText(getApplicationContext(),"Minimo"+lower_color[0]+","+lower_color[1]+","+lower_color[2],Toast.LENGTH_SHORT).show();
+            setLower_color(color);
+        }
+    }
+
+    @Override
+    public void onPositiveButtonClick(int color) {
+        if(colorUp){
+            setUpper_color(color);
+            Toast.makeText(getApplicationContext(),"Set Maximo"+upper_color[0]+","+upper_color[1]+","+upper_color[2],Toast.LENGTH_SHORT).show();
+        }else{
+            Toast.makeText(getApplicationContext(),"Set Minimo"+lower_color[0]+","+lower_color[1]+","+lower_color[2],Toast.LENGTH_SHORT).show();
+            setLower_color(color);
+        }
+    }
+
+    @Override
+    public void onNegativeButtonClick(int color) {
+
     }
 
     public static class SendPostRequest extends AsyncTask<String, Void, String> {

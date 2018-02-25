@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:opencv="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    style="@style/Landscape_camera">
+    style="@style/Landscape_camera"
+    tools:context="com.example.josea.follow_ball_opencv.MainActivity">
      <com.example.josea.follow_ball_opencv.OpenCVCameraView
          android:id="@+id/javaCameraView"
          android:layout_width="match_parent"
@@ -36,6 +38,20 @@
          android:layout_margin="12dp"
          android:src="@drawable/rotate"
          android:layout_alignParentTop="true"/>
-
-
+     <ImageView
+         android:id="@+id/imageViewLock"
+         android:layout_width="30dp"
+         android:layout_height="30dp"
+         android:layout_alignParentBottom="true"
+         android:layout_alignParentLeft="true"
+         android:layout_margin="12dp"
+         android:src="@drawable/up"/>
+     <ImageView
+         android:id="@+id/imageViewFlash"
+         android:layout_width="30dp"
+         android:layout_height="30dp"
+         android:layout_alignParentBottom="true"
+         android:layout_alignParentRight="true"
+         android:layout_margin="12dp"
+         android:src="@drawable/down"/>
 </RelativeLayout>

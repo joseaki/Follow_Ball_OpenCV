@@ -102,6 +102,17 @@ public class OpenCVCameraView extends JavaCameraView {
     public void setManualExposure(boolean value){
         Camera.Parameters parameters = mCamera.getParameters();
         parameters.setAutoExposureLock(value);
+        parameters.setVideoStabilization(true);
+        parameters.setAutoWhiteBalanceLock(true);
+        mCamera.setParameters(parameters);
+    }
+
+    public void setLedFlash(boolean value){
+        Camera.Parameters parameters = mCamera.getParameters();
+        if(value)
+            parameters.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+        else
+            parameters.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
         mCamera.setParameters(parameters);
     }
 
